@@ -1,15 +1,16 @@
 //////////////////////////////
-//  SETUP SCENE, CAMERA
+// SETUP THREE.JS
 //////////////////////////////
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 
 const camera = new THREE.PerspectiveCamera(
-    45,
+    50,
     window.innerWidth / window.innerHeight,
-    0.1, 1000
+    0.1,
+    1000
 );
-camera.position.set(5, 5, 7);
+camera.position.set(6, 6, 8);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -19,27 +20,38 @@ const controls = new THREE.OrbitControls(camera, renderer.domElement);
 
 
 //////////////////////////////
-//  CREATE 27 CUBIES
+// LIGHTS FOR GLOSSY LOOK
+//////////////////////////////
+const light1 = new THREE.PointLight(0xffffff, 1.2);
+light1.position.set(10, 10, 10);
+scene.add(light1);
+
+const light2 = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(light2);
+
+
+//////////////////////////////
+// CREATE 27 CUBIES
 //////////////////////////////
 const cubies = [];
-const size = 0.9;
+const cubeSize = 0.98;
 
 function createCubie(x, y, z) {
-    const geom = new THREE.BoxGeometry(size, size, size);
+    const geom = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
 
     const mats = [
-        new THREE.MeshBasicMaterial({ color: 0xff0000 }), // Right
-        new THREE.MeshBasicMaterial({ color: 0xffa500 }), // Left
-        new THREE.MeshBasicMaterial({ color: 0x00ff00 }), // Top
-        new THREE.MeshBasicMaterial({ color: 0x0000ff }), // Bottom
-        new THREE.MeshBasicMaterial({ color: 0xffff00 }), // Front
-        new THREE.MeshBasicMaterial({ color: 0xffffff })  // Back
+        new THREE.MeshPhongMaterial({ color: 0xff3d3d, shininess: 50 }), // Right
+        new THREE.MeshPhongMaterial({ color: 0xff8c00, shininess: 50 }), // Left
+        new THREE.MeshPhongMaterial({ color: 0x32cd32, shininess: 50 }), // Top
+        new THREE.MeshPhongMaterial({ color: 0x1e90ff, shininess: 50 }), // Bottom
+        new THREE.MeshPhongMaterial({ color: 0xffff00, shininess: 50 }), // Front
+        new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 50 })  // Back
     ];
 
-    const cube = new THREE.Mesh(geom, mats);
-    cube.position.set(x, y, z);
-    scene.add(cube);
-    return cube;
+    const mesh = new THREE.Mesh(geom, mats);
+    mesh.position.set(x, y, z);
+    scene.add(mesh);
+    return mesh;
 }
 
 for (let x = -1; x <= 1; x++) {
@@ -52,9 +64,84 @@ for (let x = -1; x <= 1; x++) {
 
 
 //////////////////////////////
-// FACE ROTATION FUNCTION
+// ROTATION SYSTEM
+//////////////////////////////
+function rotateLayer(layer, axis) {
+    let angle = 0;
+    const speed = 0.15;
+
+    const interval = setInterval(() => {
+        layer.forEach(c => c.rotateOnWorldAxis(axis, speed));
+        angle += speed;
+        if (angle >= Math.PI / 2) clearInterval(interval);
+    }, 20);
+}
+
+
+//////////////////////////////
+// SCRAMBLE SYSTEM
+//////////////////////////////
+let scrambleMoves = ["U", "D", "L", "R", "F", "B"];
+let scrambling = false;
+let timerRunning = false;
+let timerInterval;
+let seconds = 0;
+
+function updateTimer() {
+    let m = String(Math.floor(seconds / 60)).padStart(2, "0");
+    let s = String(seconds % 60).padStart(2, "0");
+    document.getElementById("timer").textContent = `${m}:${s}`;
+}
+
+function startTimer() {
+    if (timerRunning) return;
+    timerRunning = true;
+    timerInterval = setInterval(() => {
+        seconds++;
+        updateTimer();
+    }, 1000);
+}
+
+function stopTimer() {
+    clearInterval(timerInterval);
+    timerRunning = false;
+}
+
+function resetTimer() {
+    seconds = 0;
+    updateTimer();
+}
+
+document.getElementById("scrambleBtn").onclick = () => {
+    resetTimer();
+
+    let moves = [];
+    for (let i = 0; i < 20; i++) {
+        moves.push(scrambleMoves[Math.floor(Math.random() * scrambleMoves.length)]);
+    }
+
+    let i = 0;
+    scrambling = true;
+
+    const interval = setInterval(() => {
+        rotateFace(moves[i]);
+        i++;
+
+        if (i >= moves.length) {
+            clearInterval(interval);
+            scrambling = false;
+            startTimer(); // start timer after scramble ends
+        }
+    }, 300);
+};
+
+
+//////////////////////////////
+// FACE ROTATOR
 //////////////////////////////
 function rotateFace(face) {
+    if (scrambling) return;
+
     let layer;
 
     if (face === "U") layer = cubies.filter(c => c.position.y > 0.5);
@@ -73,18 +160,12 @@ function rotateFace(face) {
         B: new THREE.Vector3(0, 0, -1)
     }[face];
 
-    let angle = 0;
-    const interval = setInterval(() => {
-        const rot = 0.1;
-        angle += rot;
-        layer.forEach(c => c.rotateOnWorldAxis(axis, rot));
-        if (angle >= Math.PI / 2) clearInterval(interval);
-    }, 20);
+    rotateLayer(layer, axis);
 }
 
 
 //////////////////////////////
-// RENDER LOOP
+// ANIMATION LOOP
 //////////////////////////////
 function animate() {
     requestAnimationFrame(animate);
